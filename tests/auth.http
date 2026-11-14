@@ -1,0 +1,81 @@
+# Testes de AUTENTICACAO (Bonus 2)  -  extensao "REST Client" do VS Code
+# Reinicie o servidor antes. Rode os blocos NA ORDEM. Blocos separados por ###
+
+@host = http://localhost:8080
+
+### 1. LOGIN com senha errada (esperado: 403 Forbidden)
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin", "senha": "errada"}
+
+### 2. LOGIN com usuario errado (esperado: 403 Forbidden)
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "root", "senha": "admin123"}
+
+### 3. LOGIN sem o campo senha (esperado: 400 Bad Request)
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin"}
+
+### 4. POST /pacientes SEM Authorization (esperado: 401 Unauthorized, header WWW-Authenticate: Bearer)
+POST {{host}}/pacientes
+Content-Type: application/json
+
+{"nome": "Ana", "sintoma": "tosse", "prioridade": "verde"}
+
+### 5. POST /chamar SEM Authorization (esperado: 401)
+POST {{host}}/chamar
+
+### 6. POST /pacientes/1/finalizar SEM Authorization (esperado: 401)
+POST {{host}}/pacientes/1/finalizar
+Content-Type: application/json
+
+{"prognostico": "Alta"}
+
+### 7. POST com chave ERRADA (esperado: 401 "Chave de sessao invalida")
+POST {{host}}/pacientes
+Authorization: chave-que-nao-existe
+Content-Type: application/json
+
+{"nome": "Ana", "sintoma": "tosse", "prioridade": "verde"}
+
+### 8. LOGIN correto (esperado: 200 e {"chave": "<32 caracteres>"})
+# @name login
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin", "senha": "admin123"}
+
+###
+@token = {{login.response.body.$.chave}}
+
+### 9. POST /pacientes COM a chave (esperado: 201)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Ana Verde", "sintoma": "tosse leve", "prioridade": "verde"}
+
+### 10. A chave tambem funciona no formato "Bearer" (esperado: 200, paciente chamado)
+POST {{host}}/chamar
+Authorization: Bearer {{token}}
+
+### 11. Os GET NAO exigem chave (esperado: 200)
+GET {{host}}/fila
+
+### 12. GET /estatisticas sem chave (esperado: 200; so 1 paciente: os 401 nao criaram nada)
+GET {{host}}/estatisticas
+
+### 13. POST em rota inexistente SEM chave (esperado: 401; a autenticacao vem antes do roteamento)
+POST {{host}}/xyz
+
+### 14. POST em rota inexistente COM chave (esperado: 404)
+POST {{host}}/xyz
+Authorization: {{token}}
+
+### 15. GET /login (esperado: 405, Allow: POST)
+GET {{host}}/login

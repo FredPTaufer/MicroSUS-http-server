@@ -1,0 +1,101 @@
+# Testes de GET /estatisticas
+# Reinicie o servidor antes (memoria limpa). Rode os blocos NA ORDEM. Blocos separados por ###
+# A cada passo, rode o bloco "ESTATISTICAS" de novo e compare com o esperado.
+
+@host = http://localhost:8080
+
+### 0. LOGIN - RODE ESTE BLOCO PRIMEIRO (esperado: 200 com {"chave": "..."})
+# Todo POST abaixo envia a chave no header Authorization. Se reiniciar o servidor,
+# as chaves se perdem (ficam em memoria): rode este bloco de novo.
+# @name login
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin", "senha": "admin123"}
+
+###
+@token = {{login.response.body.$.chave}}
+
+
+### 0. ESTATISTICAS - sistema vazio (esperado: tudo zero)
+GET {{host}}/estatisticas
+
+### 1. Cadastra ANA - verde (id 1)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Ana Verde", "sintoma": "tosse leve", "prioridade": "verde"}
+
+### 2. Cadastra JOAO - amarelo (id 2)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "João Amarelo", "sintoma": "febre alta", "prioridade": "amarelo"}
+
+### 3. Cadastra MARIA - vermelho (id 3)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria Vermelha", "sintoma": "dor no peito", "prioridade": "vermelho"}
+
+### 4. Cadastra PEDRO - verde (id 4)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Pedro Verde", "sintoma": "enjoo", "prioridade": "verde"}
+
+### 5. Cadastra CARLOS - vermelho (id 5)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Carlos Vermelho", "sintoma": "falta de ar", "prioridade": "vermelho"}
+
+### 6. ESTATISTICAS (esperado: total 5 | EM_FILA 5, EM_ATENDIMENTO 0, ATENDIDO 0 | vermelho 2, amarelo 1, verde 2)
+GET {{host}}/estatisticas
+
+### 7. CHAMAR (Maria, id 3)
+POST {{host}}/chamar
+Authorization: {{token}}
+
+### 8. CHAMAR (Carlos, id 5)
+POST {{host}}/chamar
+Authorization: {{token}}
+
+### 9. ESTATISTICAS (esperado: total 5 | EM_FILA 3, EM_ATENDIMENTO 2, ATENDIDO 0 | prioridades iguais)
+GET {{host}}/estatisticas
+
+### 10. FINALIZAR a Maria
+POST {{host}}/pacientes/3/finalizar
+Authorization: {{token}}
+Content-Type: application/json
+
+{"prognostico": "Alta com repouso"}
+
+### 11. ESTATISTICAS (esperado: total 5 | EM_FILA 3, EM_ATENDIMENTO 1, ATENDIDO 1 | prioridades iguais)
+GET {{host}}/estatisticas
+
+### 12. Operacoes que FALHAM nao devem mudar nada: 409 (finalizar quem esta EM_FILA)
+POST {{host}}/pacientes/1/finalizar
+Authorization: {{token}}
+Content-Type: application/json
+
+{"prognostico": "x"}
+
+### 13. Operacao que FALHA: 400 (prioridade invalida)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "X", "sintoma": "y", "prioridade": "azul"}
+
+### 14. ESTATISTICAS (esperado: IDENTICO ao bloco 11)
+GET {{host}}/estatisticas
+
+### 15. METODO NAO PERMITIDO (esperado: 405, Allow: GET)
+POST {{host}}/estatisticas
+Authorization: {{token}}

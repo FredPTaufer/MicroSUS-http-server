@@ -1,0 +1,87 @@
+# Testes de POST /pacientes  (extensao "REST Client" do VS Code)
+# Clique em "Send Request" acima de cada bloco. Os blocos sao separados por ###
+
+@host = http://localhost:8080
+
+### 0. LOGIN - RODE ESTE BLOCO PRIMEIRO (esperado: 200 com {"chave": "..."})
+# Todo POST abaixo envia a chave no header Authorization. Se reiniciar o servidor,
+# as chaves se perdem (ficam em memoria): rode este bloco de novo.
+# @name login
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin", "senha": "admin123"}
+
+###
+@token = {{login.response.body.$.chave}}
+
+
+### 1. SUCESSO - vermelho (esperado: 201, estado EM_FILA)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria Silva", "sintoma": "dor no peito", "prioridade": "vermelho"}
+
+### 2. SUCESSO - amarelo com acento (esperado: 201)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "João Pedro", "sintoma": "febre alta", "prioridade": "amarelo"}
+
+### 3. SUCESSO - verde (esperado: 201)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Ana Costa", "sintoma": "tosse leve", "prioridade": "verde"}
+
+### 4. ERRO - JSON invalido, falta fechar a chave (esperado: 400)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria", "sintoma": "dor"
+
+### 5. ERRO - campo ausente: prioridade (esperado: 400)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria", "sintoma": "dor"}
+
+### 6. ERRO - tipo incompativel: nome numerico (esperado: 400)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": 123, "sintoma": "dor", "prioridade": "verde"}
+
+### 7. ERRO - prioridade inexistente (esperado: 400)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria", "sintoma": "dor", "prioridade": "azul"}
+
+### 8. ERRO - nome vazio (esperado: 400)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "   ", "sintoma": "dor", "prioridade": "verde"}
+
+### 9. ERRO - JSON que nao e objeto (esperado: 400)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+[1, 2, 3]
+
+### 10. ERRO - sem body (esperado: 400)
+POST {{host}}/pacientes
+Authorization: {{token}}
+
+### 11. METODO NAO PERMITIDO - GET em /pacientes (esperado: 405, Allow: POST)
+GET {{host}}/pacientes

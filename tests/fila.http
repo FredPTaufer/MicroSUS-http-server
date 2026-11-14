@@ -1,0 +1,70 @@
+# Testes de GET /fila  (extensao "REST Client" do VS Code)
+# Para VER a pagina renderizada, abra http://localhost:8080/fila no NAVEGADOR
+# (o REST Client mostra so o codigo HTML). Blocos separados por ###
+
+@host = http://localhost:8080
+
+### 0. LOGIN - RODE ESTE BLOCO PRIMEIRO (esperado: 200 com {"chave": "..."})
+# Todo POST abaixo envia a chave no header Authorization. Se reiniciar o servidor,
+# as chaves se perdem (ficam em memoria): rode este bloco de novo.
+# @name login
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin", "senha": "admin123"}
+
+###
+@token = {{login.response.body.$.chave}}
+
+
+### 0. Fila vazia - reinicie o servidor antes (esperado: 200, "Nenhum paciente na fila")
+GET {{host}}/fila
+
+### 1. Cadastra VERDE (id 1)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Ana Verde", "sintoma": "tosse leve", "prioridade": "verde"}
+
+### 2. Cadastra AMARELO (id 2)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "João Amarelo", "sintoma": "febre alta", "prioridade": "amarelo"}
+
+### 3. Cadastra VERMELHO (id 3)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria Vermelha", "sintoma": "dor no peito", "prioridade": "vermelho"}
+
+### 4. Cadastra outro VERDE (id 4) - deve ficar DEPOIS da Ana (FIFO)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Pedro Verde", "sintoma": "enjoo", "prioridade": "verde"}
+
+### 5. Cadastra outro VERMELHO (id 5) - deve ficar DEPOIS da Maria (FIFO)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Carlos Vermelho", "sintoma": "falta de ar", "prioridade": "vermelho"}
+
+### 6. Fila (esperado, na ordem: Maria, Carlos, João, Ana, Pedro)
+GET {{host}}/fila
+
+### 7. Teste de seguranca - nome com HTML (a tabela deve mostrar o texto, nao negrito)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "<b>Hacker</b> & Cia", "sintoma": "<script>alert(1)</script>", "prioridade": "verde"}
+
+### 8. METODO NAO PERMITIDO (esperado: 405, Allow: GET)
+POST {{host}}/fila
+Authorization: {{token}}

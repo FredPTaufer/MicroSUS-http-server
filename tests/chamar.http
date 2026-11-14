@@ -1,0 +1,87 @@
+# Testes de POST /chamar  (extensao "REST Client" do VS Code)
+# Reinicie o servidor antes (memoria limpa). Blocos separados por ###
+# Dica: deixe http://localhost:8080/fila aberto no navegador e de F5 a cada passo.
+
+@host = http://localhost:8080
+
+### 0. LOGIN - RODE ESTE BLOCO PRIMEIRO (esperado: 200 com {"chave": "..."})
+# Todo POST abaixo envia a chave no header Authorization. Se reiniciar o servidor,
+# as chaves se perdem (ficam em memoria): rode este bloco de novo.
+# @name login
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin", "senha": "admin123"}
+
+###
+@token = {{login.response.body.$.chave}}
+
+
+### 1. FILA VAZIA (esperado: 404, "Fila vazia...")
+POST {{host}}/chamar
+Authorization: {{token}}
+
+### 2. Cadastra VERDE (id 1)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Ana Verde", "sintoma": "tosse leve", "prioridade": "verde"}
+
+### 3. Cadastra AMARELO (id 2)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "João Amarelo", "sintoma": "febre alta", "prioridade": "amarelo"}
+
+### 4. Cadastra VERMELHO (id 3)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria Vermelha", "sintoma": "dor no peito", "prioridade": "vermelho"}
+
+### 5. Cadastra outro VERDE (id 4)
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Pedro Verde", "sintoma": "enjoo", "prioridade": "verde"}
+
+### 6. CHAMAR #1 (esperado: 200, Maria - id 3, estado EM_ATENDIMENTO)
+POST {{host}}/chamar
+Authorization: {{token}}
+
+### 7. Consulta a Maria (esperado: estado EM_ATENDIMENTO)
+GET {{host}}/pacientes/3
+
+### 8. CHAMAR #2 (esperado: Joao - id 2, amarelo)
+POST {{host}}/chamar
+Authorization: {{token}}
+
+### 9. NOVO VERMELHO chega depois (id 5) - deve furar a fila
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Carlos Vermelho", "sintoma": "falta de ar", "prioridade": "vermelho"}
+
+### 10. CHAMAR #3 (esperado: Carlos - id 5, apesar de ter chegado por ultimo)
+POST {{host}}/chamar
+Authorization: {{token}}
+
+### 11. CHAMAR #4 (esperado: Ana - id 1, verde mais antigo)
+POST {{host}}/chamar
+Authorization: {{token}}
+
+### 12. CHAMAR #5 (esperado: Pedro - id 4, ultimo da fila)
+POST {{host}}/chamar
+Authorization: {{token}}
+
+### 13. CHAMAR #6 (esperado: 404, fila vazia de novo)
+POST {{host}}/chamar
+Authorization: {{token}}
+
+### 14. METODO NAO PERMITIDO (esperado: 405, Allow: POST)
+GET {{host}}/chamar

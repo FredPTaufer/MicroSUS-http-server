@@ -1,0 +1,40 @@
+# Testes de GET /pacientes/{id}  (extensao "REST Client" do VS Code)
+# ANTES: reinicie o servidor e rode os blocos 1, 2 e 3 de pacientes.http
+# para existirem os pacientes de id 1, 2 e 3. Blocos separados por ###
+
+@host = http://localhost:8080
+
+### 0. LOGIN - RODE ESTE BLOCO PRIMEIRO (esperado: 200 com {"chave": "..."})
+# Todo POST abaixo envia a chave no header Authorization. Se reiniciar o servidor,
+# as chaves se perdem (ficam em memoria): rode este bloco de novo.
+# @name login
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin", "senha": "admin123"}
+
+###
+@token = {{login.response.body.$.chave}}
+
+
+### 1. SUCESSO - consulta o paciente 1 (esperado: 200, estado EM_FILA, prognostico null)
+GET {{host}}/pacientes/1
+
+### 2. SUCESSO - consulta o paciente 2 (esperado: 200)
+GET {{host}}/pacientes/2
+
+### 3. ERRO - id que nao existe (esperado: 404)
+GET {{host}}/pacientes/999
+
+### 4. ERRO - id nao numerico (esperado: 404)
+GET {{host}}/pacientes/abc
+
+### 5. ERRO - id negativo (esperado: 404)
+GET {{host}}/pacientes/-1
+
+### 6. METODO NAO PERMITIDO - DELETE (esperado: 405, Allow: GET)
+DELETE {{host}}/pacientes/1
+
+### 7. METODO NAO PERMITIDO - POST (esperado: 405, Allow: GET)
+POST {{host}}/pacientes/1
+Authorization: {{token}}
