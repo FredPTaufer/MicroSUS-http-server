@@ -1,0 +1,197 @@
+# ===========================================================================
+#  MicroSUS - demonstracao com a extensao REST Client do VS Code
+# ===========================================================================
+#  COMO USAR
+#   1. Em um terminal:  python main.py      (memoria limpa a cada inicio)
+#   2. Clique em "Send Request" acima de cada bloco, NA ORDEM.
+#   3. A resposta aparece ao lado, no proprio VS Code. O titulo de cada bloco
+#      diz o que esperar.
+#   4. Deixe http://localhost:8080/fila aberto no navegador e de F5 a cada passo.
+#
+#  Se o servidor for reiniciado, rode o bloco C4 (login) de novo: as chaves
+#  de sessao ficam em memoria e se perdem.
+#
+#  OPCIONAL - mostrar o multithread (bonus): abra um 2o terminal e rode
+#     python -c "import socket,time; s=socket.create_connection(('127.0.0.1',8080)); time.sleep(20)"
+#  Isso deixa uma conexao ociosa aberta. Enquanto ela existe, envie qualquer
+#  bloco abaixo: a resposta vem na hora, pois cada conexao tem a sua thread.
+# ===========================================================================
+
+@host = http://localhost:8080
+
+
+### [B1] Servidor no ar: estatisticas com o sistema vazio | esperado: 200, tudo zero
+GET {{host}}/estatisticas
+
+
+### [B2] Fila vazia (HTML) - veja tambem no navegador | esperado: 200, "Nenhum paciente na fila"
+GET {{host}}/fila
+
+
+### [C1] AUTENTICACAO: POST sem o header Authorization | esperado: 401 + header WWW-Authenticate
+POST {{host}}/pacientes
+Content-Type: application/json
+
+{"nome": "Maria Silva", "sintoma": "dor no peito", "prioridade": "vermelho"}
+
+
+### [C2] POST com chave ERRADA | esperado: 401 "Chave de sessao invalida"
+POST {{host}}/chamar
+Authorization: chave-errada
+
+
+### [C3] Login com senha errada | esperado: 403 Forbidden
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin", "senha": "errada"}
+
+
+### [C4] LOGIN CORRETO (guarda a chave em {{token}}) | esperado: 200 com {"chave": "..."}
+# @name login
+POST {{host}}/login
+Content-Type: application/json
+
+{"usuario": "admin", "senha": "admin123"}
+
+###
+@token = {{login.response.body.$.chave}}
+
+
+### [D1] Cadastrar Ana (verde) -> id 1 | esperado: 201, estado EM_FILA
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Ana Costa", "sintoma": "tosse leve", "prioridade": "verde"}
+
+
+### [D2] Cadastrar João (amarelo) -> id 2 | esperado: 201
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "João Pedro", "sintoma": "febre alta", "prioridade": "amarelo"}
+
+
+### [D3] Cadastrar Maria (vermelho) -> id 3 | esperado: 201
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria Silva", "sintoma": "dor no peito", "prioridade": "vermelho"}
+
+
+### [D4] Cadastrar Pedro (verde) -> id 4 | esperado: 201
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Pedro Lima", "sintoma": "enjoo", "prioridade": "verde"}
+
+
+### [D5] ERRO: JSON invalido (falta fechar a chave) | esperado: 400 "JSON invalido"
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria", "sintoma": "dor"
+
+
+### [D6] ERRO: prioridade inexistente | esperado: 400 "Prioridade invalida..."
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Maria", "sintoma": "dor", "prioridade": "azul"}
+
+
+### [D7] FILA ordenada (abra no navegador) | esperado: 200 HTML, ordem: Maria, João, Ana, Pedro
+GET {{host}}/fila
+
+
+### [D8] Consultar o paciente 1 | esperado: 200, EM_FILA, prognostico null
+GET {{host}}/pacientes/1
+
+
+### [D9] Consultar paciente inexistente | esperado: 404
+GET {{host}}/pacientes/999
+
+
+### [E1] MAQUINA DE ESTADOS: finalizar paciente que esta EM_FILA (Ana) | esperado: 409 "esta EM_FILA..."
+POST {{host}}/pacientes/1/finalizar
+Authorization: {{token}}
+Content-Type: application/json
+
+{"prognostico": "Alta com repouso e retorno em 7 dias"}
+
+
+### [E2] CHAMAR o proximo | esperado: 200, Maria (id 3), estado EM_ATENDIMENTO
+POST {{host}}/chamar
+Authorization: {{token}}
+
+
+### [E3] Chega um NOVO paciente vermelho: Carlos -> id 5 | esperado: 201
+POST {{host}}/pacientes
+Authorization: {{token}}
+Content-Type: application/json
+
+{"nome": "Carlos Souza", "sintoma": "falta de ar", "prioridade": "vermelho"}
+
+
+### [E4] Fila agora (navegador) | esperado: Carlos em 1o, apesar de ter chegado por ultimo
+GET {{host}}/fila
+
+
+### [E5] CHAMAR de novo | esperado: 200, Carlos (id 5) - o vermelho "furou" a fila
+POST {{host}}/chamar
+Authorization: {{token}}
+
+
+### [E6] ERRO: finalizar Maria com prognostico de tipo errado | esperado: 400 (e Maria continua EM_ATENDIMENTO)
+POST {{host}}/pacientes/3/finalizar
+Authorization: {{token}}
+Content-Type: application/json
+
+{"prognostico": 123}
+
+
+### [E7] FINALIZAR Maria | esperado: 200, estado ATENDIDO, com prognostico
+POST {{host}}/pacientes/3/finalizar
+Authorization: {{token}}
+Content-Type: application/json
+
+{"prognostico": "Alta com repouso e retorno em 7 dias"}
+
+
+### [E8] Finalizar Maria DE NOVO (ATENDIDO e terminal) | esperado: 409 "ja esta ATENDIDO..."
+POST {{host}}/pacientes/3/finalizar
+Authorization: {{token}}
+Content-Type: application/json
+
+{"prognostico": "Tentando sobrescrever"}
+
+
+### [E9] Consultar Maria | esperado: 200, ATENDIDO, prognostico original preservado
+GET {{host}}/pacientes/3
+
+
+### [F1] ESTATISTICAS | esperado: total 5 | EM_FILA 3, EM_ATENDIMENTO 1, ATENDIDO 1 | vermelho 2, amarelo 1, verde 2
+GET {{host}}/estatisticas
+
+
+### [F2] Rota inexistente | esperado: 404
+GET {{host}}/xyz
+
+
+### [F3] Metodo nao permitido: GET em /pacientes | esperado: 405, header Allow: POST
+GET {{host}}/pacientes
+
+
+### [F4] Metodo nao permitido: POST em /fila | esperado: 405, header Allow: GET
+POST {{host}}/fila
+Authorization: {{token}}
+
+
+### [F5] Metodo nao permitido: DELETE em /pacientes/1 | esperado: 405, header Allow: GET
+DELETE {{host}}/pacientes/1
